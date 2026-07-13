@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PlantShade: Predicting Plant Shadows for Lighting-Aware Robotic Agriculture</title>
+<meta name="description" content="PlantShade (IROS 2026): a 38,500-pair plant shade dataset from a Helios-UE5 pipeline and a ControlNet-conditioned diffusion model that generates realistic, time-varying plant shadow maps for lighting-aware robotic agriculture." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="logo-dot"></span>
+      <span>Plant<span class="brand-accent">Shade</span></span>
+    </a>
+    <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
+    <div class="nav-links" id="navLinks">
+      <a href="#collect">Data</a>
+      <a href="#preprocess">Preprocess</a>
+      <a href="#demo">Demo</a>
+      <a href="#model">Model</a>
+      <a href="#results">Results</a>
+      <a href="#photosynthesis">Photosynthesis</a>
+      <a href="#PAPER_URL" data-link="paper" target="_blank" class="nav-cta">Paper ↗</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero" id="top">
+  <div class="hero-bg"></div>
+  <div class="container hero-inner">
+    <div class="badges">
+      <span class="badge badge-venue">IROS 2026</span>
+      <span class="badge">Arizona State University</span>
+      <span class="badge">Cornell University</span>
+    </div>
+    <h1>Predicting <span class="grad">plant shadows</span><br/>for lighting-aware robotic agriculture.</h1>
+    <p class="lede">
+      A Helios and UE5 simulation pipeline plus a ControlNet-conditioned diffusion model that generate
+      realistic, time-varying plant shadow maps from a fixed top-down camera, enabling
+      <i>in&nbsp;silico</i> evaluation of supplemental lighting and its downstream effect on canopy photosynthesis.
+    </p>
+    <div class="authors">
+      Longchao&nbsp;Da<sup>1,*</sup>, Xiaoou&nbsp;Liu<sup>1,*</sup>, Xingjian&nbsp;Li<sup>2,*</sup>,
+      Lirong&nbsp;Xiang<sup>2,†</sup>, Hua&nbsp;Wei<sup>1,†</sup>
+      <span class="aff"><sup>1</sup>School of Computing and Augmented Intelligence, Arizona State University, Tempe, AZ&nbsp;&nbsp;&nbsp;<sup>2</sup>Automation and Robotics Laboratory, Cornell University, Ithaca, NY</span>
+      <span class="aff"><sup>*</sup>Equal contribution&nbsp;&nbsp;&nbsp;<sup>†</sup>Co-corresponding authors: lxiang@cornell.edu, hua.wei@asu.edu</span>
+    </div>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="#PAPER_URL" data-link="paper" target="_blank">Read the Paper</a>
+      <a class="btn btn-ghost" href="https://github.com/ARLabXiang/AgriRoboSimUE5/releases/tag/plantshade" target="_blank">Data Collection ↗</a>
+      <a class="btn btn-ghost" href="#HF_URL" data-link="hf" target="_blank">Dataset on 🤗</a>
+      <a class="btn btn-ghost" href="#CODE_URL" data-link="code" target="_blank">Code</a>
+    </div>
+    <div class="hero-stats">
+      <div><b data-count="38500" data-suffix="">0</b><span>Image pairs</span></div>
+      <div><b data-count="4">0</b><span>Crop species</span></div>
+      <div><b data-count="385">0</b><span>Plant models</span></div>
+      <div><b data-count="100">0</b><span>Light positions</span></div>
+      <div><b>1920×1080</b><span>Resolution</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ PIPELINE STRIP ============ -->
+<div class="pipeline-strip">
+  <div class="container pipe-inner">
+    <a href="#collect" class="pipe-step"><span class="pipe-num">1</span><span>Collect</span><small>Helios · UE5</small></a>
+    <span class="pipe-arrow">→</span>
+    <a href="#preprocess" class="pipe-step"><span class="pipe-num">2</span><span>Preprocess</span><small>source·target·prompt</small></a>
+    <span class="pipe-arrow">→</span>
+    <a href="#model" class="pipe-step"><span class="pipe-num">3</span><span>Train</span><small>ControlNet + SD2.1</small></a>
+    <span class="pipe-arrow">→</span>
+    <a href="#demo" class="pipe-step"><span class="pipe-num">4</span><span>Infer</span><small>shadow map</small></a>
+    <span class="pipe-arrow">→</span>
+    <a href="#photosynthesis" class="pipe-step"><span class="pipe-num">5</span><span>Photosynthesis</span><small>NRH gain</small></a>
+  </div>
+</div>
+
+<!-- ============ GRAPHICAL ABSTRACT ============ -->
+<div class="overview-band">
+  <div class="container">
+    <figure class="figure">
+      <img src="assets/figs/fig_teaser.jpg" alt="PlantShade overview" />
+      <figcaption><b>Overview.</b> A camera and a supplementary light on a circular trajectory capture plant image,
+      shade ground truth, and depth; a generative model turns plant appearance + light position into a shadow map,
+      supporting lighting optimization, light-exposure analysis, and robotic pruning.</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- ============ 1 · DATA COLLECTION ============ -->
+<section id="collect" class="section">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Step 1 · Data collection</span>
+      <h2>A Helios and UE5 pipeline for photorealistic shade.</h2>
+      <p>We bridge the biophysical procedural modeling of <b>Helios</b> with the real-time photorealistic rendering of
+      <b>Unreal&nbsp;Engine&nbsp;5</b> via ROSbridge/ROSIntegration. Plant meshes (OBJ&nbsp;+&nbsp;MTL) are streamed into UE5 and
+      rendered from a fixed nadir camera, producing aligned RGB, plant-mask, and shadow-intensity ground truth as a
+      supplementary light orbits the canopy.</p>
+    </div>
+
+    <div class="split">
+      <figure class="figure">
+        <img src="assets/figs/fig_pipeline.jpg" alt="Helios-UE5 data generation pipeline" />
+        <figcaption><b>Fig. 2.</b> Helios procedural meshes stream into UE5 via ROSbridge/ROSIntegration; SceneCapture
+        renders image data while a PointLight orbits along the light trajectory.</figcaption>
+      </figure>
+      <div class="spec-panel">
+        <h3>Dataset specifications</h3>
+        <table class="spec-table">
+          <tr><td>Total image pairs</td><td>38,500</td></tr>
+          <tr><td>Resolution</td><td>1920 × 1080</td></tr>
+          <tr><td>Camera height</td><td>1.8 m (nadir view)</td></tr>
+          <tr><td>Plant species</td><td>Tomato · Soybean · Sugar beet · Strawberry</td></tr>
+          <tr><td>Plant age range</td><td>7 to 119 days</td></tr>
+          <tr><td>Layout configs</td><td>1×1 · 1×3 · 3×5 (50 cm spacing)</td></tr>
+          <tr><td>Solar elevation</td><td>52.24°</td></tr>
+          <tr><td>Supp. light orbit</td><td>1.8 m height · 1.25 m radius · 100 positions</td></tr>
+          <tr><td>Modalities</td><td>RGB · Plant mask · Shadow mask · Depth</td></tr>
+        </table>
+        <a class="btn btn-primary btn-small" href="https://github.com/ARLabXiang/AgriRoboSimUE5/releases/tag/plantshade" target="_blank">Download the simulator / release ↗</a>
+      </div>
+    </div>
+
+    <div class="species-strip" id="speciesStrip">
+      <figure><img src="assets/species/tomato.jpg" alt="tomato"/><figcaption>Tomato<span>P<sub>max</sub> 17.5</span></figcaption></figure>
+      <figure><img src="assets/species/soybean.jpg" alt="soybean"/><figcaption>Soybean<span>P<sub>max</sub> 32.5</span></figcaption></figure>
+      <figure><img src="assets/species/sugarbeet.jpg" alt="sugar beet"/><figcaption>Sugar beet<span>P<sub>max</sub> 20.0</span></figcaption></figure>
+      <figure><img src="assets/species/strawberry.jpg" alt="strawberry"/><figcaption>Strawberry<span>P<sub>max</sub> 12.0</span></figcaption></figure>
+    </div>
+
+    <div class="two-up">
+      <figure class="figure">
+        <img src="assets/figs/fig_growth.jpg" alt="growth stages" />
+        <figcaption><b>Growth stages.</b> Aligned RGB and shadow ground truth across days 7 → 70 for strawberry and soybean.</figcaption>
+      </figure>
+      <figure class="figure">
+        <img src="assets/figs/fig_heliosue5.jpg" alt="Helios vs UE5 sun coverage" />
+        <figcaption><b>Fig. 3.</b> UE5 shade intensity tracks Helios' sunlit-fraction curve as the light orbits, validating the real-time renderer.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2 · PREPROCESSING ============ -->
+<section id="preprocess" class="section section-alt">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Step 2 · Preprocessing</span>
+      <h2>From raw renders to model inputs.</h2>
+      <p>After downloading the per-scene zips from the data-collection release, <code>1_extract_shadow.py</code> turns each
+      rendered frame into the training <b>target</b>: it thresholds the shadow-intensity render, keeps the plant region,
+      and composites a color-coded map (background <code>#a0a0a0</code>, skeleton <code>#ffffff</code>, shadow
+      <code>#070707</code>), writing both <code>target/</code> and the raw <code>targetRaw/</code>. Each sample becomes a
+      <code>(source, target, prompt)</code> triplet, resized to 512×512, shuffled (seed&nbsp;42) and split 80/20.</p>
+    </div>
+    <div class="code-grid">
+      <div class="code-card">
+        <div class="code-title">🌑 Step 1 · Extract shadow targets</div>
+<pre><code># unzip a scene, then extract shadow maps
+unzip data/examples/&lt;scene&gt;.zip -d data/PlantShadeUnzip/
+
+python 1_extract_shadow.py \
+    --base_root data/PlantShadeUnzip \
+    --out_root  data/shadow
+# -> data/shadow/target/ and data/shadow/targetRaw/</code></pre>
+      </div>
+      <div class="code-card">
+        <div class="code-title">🧩 Step 2 · Triplet format + split</div>
+<pre><code>{"source": ".../seg_54.png",     # plant skeleton / edge
+ "target": ".../target/.../seg_54.png",
+ "prompt": "122.786 -23.423 280.000"}   # light x y z
+
+# pair source/target/prompt, 80/20 split (seed 42)
+python 2_build_split.py \
+    --source_root data/PlantShadeUnzip \
+    --target_root data/shadow/target --out_dir data</code></pre>
+      </div>
+    </div>
+    <p class="caption">30,900 pairs for training and in-domain eval, 7,600 held out for out-of-domain (OOD) evaluation.</p>
+  </div>
+</section>
+
+<!-- ============ 3/4 · INTERACTIVE DEMO ============ -->
+<section id="demo" class="section">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Interactive · Circular supplementary light</span>
+      <h2>Watch the shadow follow the light.</h2>
+      <p>The supplementary light orbits the canopy along a fixed circle (1.25 m radius, 1.8 m height). Pick a layout, then
+      drag the slider or press ▶ Play to move the light through its sampled positions and watch the shadow map evolve for
+      all four crops at a mid growth stage.</p>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-header">
+        <div class="demo-title">Circular supplementary light · four crops</div>
+        <div class="time-readout">
+          <div class="time-value">position <span id="posLabel">1</span> / 100</div>
+          <div class="sun-meta"><span id="angleMeta">azimuth 0°</span></div>
+        </div>
+      </div>
+
+      <div class="layout-tabs" id="layoutTabs">
+        <button class="tab active" data-layout="1x1">1 × 1</button>
+        <button class="tab" data-layout="1x3">1 × 3</button>
+        <button class="tab" data-layout="3x5">3 × 5</button>
+      </div>
+
+      <div class="demo-grid" id="demoGrid">
+        <figure><img data-sp="tomato" alt="tomato shadow"/><figcaption>Tomato</figcaption></figure>
+        <figure><img data-sp="soybean" alt="soybean shadow"/><figcaption>Soybean</figcaption></figure>
+        <figure><img data-sp="strawberry" alt="strawberry shadow"/><figcaption>Strawberry</figcaption></figure>
+        <figure><img data-sp="sugarbeet" alt="sugar beet shadow"/><figcaption>Sugar beet</figcaption></figure>
+      </div>
+
+      <div class="demo-controls">
+        <button id="playBtn" class="btn btn-primary btn-small">▶ Play</button>
+        <input id="lightSlider" type="range" min="1" max="8" value="1" step="1" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 · MODEL ============ -->
+<section id="model" class="section section-alt">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Step 3 · Generative shade model</span>
+      <h2>ControlNet-conditioned diffusion.</h2>
+      <p>A text encoder maps the light-position prompt to an embedding injected via cross-attention, while a ControlNet
+      branch fuses the structural condition (edge/mask) with the appearance prior and guides a Stable&nbsp;Diffusion&nbsp;v2.1
+      U-Net. Because appearance and structure stay fixed, variation in the output is driven purely by the moving light.</p>
+    </div>
+
+    <figure class="figure">
+      <img src="assets/figs/fig_arch.jpg" alt="PlantShade model architecture" />
+      <figcaption><b>Fig. 4.</b> A free-form text prompt (light position) is encoded and injected via cross-attention;
+      a ControlNet branch fuses RGB + Canny-edge structure to guide the diffusion U-Net toward the shadow map.</figcaption>
+    </figure>
+
+    <div class="split" style="margin-top:28px">
+      <div class="code-card">
+        <div class="code-title">🚀 Step 3 · Train the shade model</div>
+<pre><code># ControlNet branch on a frozen SD v2.1 backbone
+python 3_train.py
+
+# key config (override via env vars)
+init_ckpt     = models/control_sd21_ini.ckpt
+batch_size    = 16   # PS_BATCH
+learning_rate = 1e-5 # PS_LR
+resolution    = 512 × 512</code></pre>
+      </div>
+      <div class="mini-cards">
+        <div class="mini-card"><b>Backbone</b><span>Stable Diffusion v2.1</span></div>
+        <div class="mini-card"><b>Control</b><span>ControlNet (edge + appearance)</span></div>
+        <div class="mini-card"><b>Condition</b><span>text prompt = light position</span></div>
+        <div class="mini-card"><b>Objective</b><span>denoising ε-prediction loss</span></div>
+      </div>
+    </div>
+
+    <!-- Inference -->
+    <div class="section-head" style="margin-top:56px">
+      <span class="eyebrow">Step 4 · Inference</span>
+      <h2>Plant appearance plus light prompt to shadow map.</h2>
+      <p>Given a plant image and a text prompt for the light position, the model generates the shadow map without full 3D
+      rendering. Below are representative cases where the generated shadow closely matches ground truth across the four
+      crops, growth stages, and layouts.</p>
+    </div>
+
+    <h3 style="margin:8px 0 0;font-size:1.05rem">Generated shadow maps (trained checkpoint, epoch 51)</h3>
+    <div class="pred-tabs" id="predTabs">
+      <button class="tab active" data-case="tomato_1x1_day63">Tomato · 1×1 · day 63</button>
+      <button class="tab" data-case="sugarbeet_1x3_day49">Sugar beet · 1×3 · day 49</button>
+      <button class="tab" data-case="tomato_3x5_day28">Tomato · 3×5 · day 28</button>
+    </div>
+    <div class="compare-card">
+      <div class="compare-stage" id="compareStage">
+        <img id="compareLeft"  class="compare-img" src="assets/predictions/tomato_1x1_day63_rgb.jpg" alt="input plant (RGB)" />
+        <img id="compareRight" class="compare-img compare-clip" src="assets/predictions/tomato_1x1_day63_pred.png" alt="predicted shadow" />
+        <div class="compare-divider" id="compareDivider"><div class="compare-handle">⇆</div></div>
+        <div class="compare-label left">Plant (RGB)</div>
+        <div class="compare-label right">Predicted shadow</div>
+      </div>
+    </div>
+    <p class="pred-note">Drag the divider to wipe between the input plant and the model's predicted shadow map. All four are
+    held-out samples generated with DDIM (50 steps, guidance 9.0); predictions are upscaled to the capture resolution.</p>
+
+    <figure class="figure figure-narrow" style="margin-top:36px">
+      <img src="assets/figs/fig_qualitative.jpg" alt="qualitative generation results" />
+      <figcaption><b>Fig. 6.</b> For each case: raw image, ground truth, skeleton input, and the PlantShade-generated
+      shadow (right of the dashed line). Results span species, growth stages, and 1×1 / 1×3 / 3×5 layouts.</figcaption>
+    </figure>
+
+    <div class="code-card" style="margin-top:28px">
+      <div class="code-title">🔮 Run inference on the test split</div>
+<pre><code># checkpoint: huggingface.co/xiao0o0o/PlantShade-ControlNet
+PS_CKPT=/path/to/plantshade_epoch51.ckpt \
+PS_TEST_JSON=data/test_split.json python 4_infer.py
+
+# key defaults
+config      = models/cldm_v21.yaml
+ddim_steps  = 50
+guidance    = 9.0
+shade_thresh = 40
+# -> outputs/predictions/generated_*.png (pure) + compare_*.png</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MODALITIES ============ -->
+<section id="modalities" class="section">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Aligned modalities</span>
+      <h2>One frame, five registered views.</h2>
+      <p>Every capture provides spatially-aligned RGB, structural edges, plant mask, shadow map, and a depth map used
+      downstream for physically-grounded leaf-area and photosynthesis estimation.</p>
+    </div>
+    <div class="modality-grid">
+      <figure><img src="assets/modality/rgb.jpg" alt="rgb"/><figcaption><b>RGB</b><br/>Plant appearance <i>I₀</i></figcaption></figure>
+      <figure><img src="assets/modality/edge.png" alt="edge"/><figcaption><b>Edge</b><br/>Structural cue <i>S</i></figcaption></figure>
+      <figure><img src="assets/modality/mask.png" alt="mask"/><figcaption><b>Plant mask</b><br/>Leaf region</figcaption></figure>
+      <figure><img src="assets/modality/shadow.png" alt="shadow"/><figcaption><b>Shadow map</b><br/>Target <i>Mₜ</i></figcaption></figure>
+      <figure><img src="assets/modality/depth.png" alt="depth"/><figcaption><b>Depth</b><br/>For leaf-area <i>A</i></figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section id="results" class="section section-alt">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Quantitative results</span>
+      <h2>Consistently ahead of Stable Diffusion.</h2>
+      <p>PlantShade vs. a Stable Diffusion baseline across species and layout complexity. Higher is better for
+      mIoU / B-IoU; lower is better for LPIPS / MSE. Columns marked <span class="ood-chip">OOD</span> are out-of-domain.</p>
+    </div>
+    <div class="result-tabs">
+      <button class="tab active" data-layout="single">Single plant</button>
+      <button class="tab" data-layout="l1x3">1 × 3</button>
+      <button class="tab" data-layout="l3x5">3 × 5</button>
+    </div>
+    <div class="table-wrap">
+      <table class="results-table" id="resultsTable"></table>
+    </div>
+    <p class="caption">Both methods degrade under OOD placement, confirming the intrinsic difficulty of distribution shift,
+    yet PlantShade keeps a clear margin in every setting.</p>
+
+    <figure class="figure figure-narrow" style="margin-top:32px">
+      <img src="assets/figs/fig_ood.jpg" alt="ID to OOD performance" />
+      <figcaption><b>Fig. 5.</b> Left: MSE degradation from in-distribution to OOD. Right: on the 3×5 OOD setting,
+      PlantShade still dominates Stable Diffusion across all four metrics.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ PHOTOSYNTHESIS ============ -->
+<section id="photosynthesis" class="section">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Step 5 · Downstream · Photosynthetic gain</span>
+      <h2>From shadow maps to canopy carbon assimilation.</h2>
+      <p>Predicted shadow maps and rendered depth maps drive a non-rectangular hyperbola (NRH) light-response model.
+      Leaf area comes from depth under a pinhole camera (<i>f</i>=872.72&nbsp;px); the shaded fraction <i>f</i> weights sunlit vs.
+      shaded photosynthesis into a canopy rate. Explore each species' light-response curve below.</p>
+    </div>
+
+    <div class="split">
+      <div class="photo-panel">
+        <div class="photo-species" id="photoSpecies">
+          <button class="chip active" data-sp="soybean">Soybean</button>
+          <button class="chip" data-sp="sugarbeet">Sugar beet</button>
+          <button class="chip" data-sp="tomato">Tomato</button>
+          <button class="chip" data-sp="strawberry">Strawberry</button>
+        </div>
+        <canvas id="nrhCanvas" width="520" height="320"></canvas>
+        <div class="nrh-eq">P(I) = 1⁄2θ&nbsp;[ αI + P<sub>max</sub> − √((αI+P<sub>max</sub>)² − 4θαI·P<sub>max</sub>) ]</div>
+      </div>
+      <div class="photo-readout">
+        <div class="param-row"><span>P<sub>max</sub></span><b id="pMax">32.5</b><small>µmol CO₂ m⁻² s⁻¹</small></div>
+        <div class="param-row"><span>α (quantum yield)</span><b>0.05</b><small>mol CO₂ mol⁻¹</small></div>
+        <div class="param-row"><span>θ (convexity)</span><b>0.7</b><small></small></div>
+        <div class="param-row"><span>I₀ (ambient PAR)</span><b>1000</b><small>µmol m⁻² s⁻¹</small></div>
+        <div class="param-row"><span>β (shade transmittance)</span><b>0.3</b><small></small></div>
+        <div class="gain-note" id="gainNote"></div>
+      </div>
+    </div>
+
+    <div class="code-grid" style="margin-top:28px">
+      <div class="code-card">
+        <div class="code-title">🌿 Step 5 · Estimate canopy photosynthesis</div>
+<pre><code>python 5_photosynthesis.py \
+    --eval_dir outputs/predictions \
+    --gt_base_dir data/shadow/target \
+    --depth_base_dir data/PlantShadeUnzip \
+    --output_csv outputs/photosynthesis.csv
+
+def nrh(I, alpha, P_max, theta):        # non-rectangular hyperbola
+    a = alpha*I + P_max
+    disc = max(a**2 - 4*theta*alpha*I*P_max, 0)
+    return (a - np.sqrt(disc)) / (2*theta)</code></pre>
+      </div>
+      <div class="code-card">
+        <div class="code-title">📐 Leaf area and shaded fraction</div>
+<pre><code># leaf area from depth (pinhole, fx=fy=872.72)
+A_px = depth**2 / (fx*fy)
+A_total  = A_px[leaf_mask].sum()
+f        = A_px[shadow_mask].sum() / A_total   # shaded fraction
+
+P_canopy = (1-f)*nrh(I0, ...) + f*nrh(beta*I0, ...)</code></pre>
+      </div>
+    </div>
+
+    <figure class="figure" style="margin-top:28px">
+      <img src="assets/figs/fig_photosynthesis.jpg" alt="photosynthetic gain pipeline and results" />
+      <figcaption><b>Fig. 7.</b> Depth + predicted shadow → leaf area and shaded fraction → NRH canopy rate. Optimal
+      supplemental light placement consistently raises canopy photosynthesis across all species and layouts.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ APPLICATIONS ============ -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Applications</span>
+      <h2>What realistic shade prediction unlocks.</h2>
+    </div>
+    <div class="app-grid">
+      <div class="app-card"><div class="app-ico">💡</div><h3>Supplemental lighting optimization</h3><p>Evaluate light placement and trajectory <i>in silico</i> to maximize canopy photosynthesis before physical deployment.</p></div>
+      <div class="app-card"><div class="app-ico">🌡️</div><h3>Microclimate analysis</h3><p>Spatially-resolved shade sequences inform planting density, row orientation, and sensor placement.</p></div>
+      <div class="app-card"><div class="app-ico">✂️</div><h3>Shade-aware pruning</h3><p>Simulate branch removal to reduce self-shading and improve canopy light uniformity and yield.</p></div>
+      <div class="app-card"><div class="app-ico">🤖</div><h3>Sim-to-real perception</h3><p>Large-scale pixel-aligned RGB/shadow pairs for lighting-invariant robot perception under diverse illumination.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DATASET / CITE ============ -->
+<section id="dataset" class="section">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Get the data</span>
+      <h2>Load PlantShade.</h2>
+    </div>
+    <div class="code-grid">
+      <div class="code-card">
+        <div class="code-title">🤗 Dataset + model on HuggingFace</div>
+<pre><code>from huggingface_hub import hf_hub_download
+
+# one scene from the dataset
+zip_path = hf_hub_download(
+    "xiao0o0o/PlantShade",
+    "tomato_seed2_14_7_77.zip", repo_type="dataset")
+
+# trained checkpoint (~13 GB)
+ckpt = hf_hub_download(
+    "xiao0o0o/PlantShade-ControlNet",
+    "plantshade_epoch51.ckpt")</code></pre>
+      </div>
+      <div class="code-card">
+        <div class="code-title">⬇️ Data collection release</div>
+<pre><code># Helios-UE5 simulator + raw captures
+# github.com/ARLabXiang/AgriRoboSimUE5
+#   releases/tag/plantshade</code></pre>
+      </div>
+      <div class="code-card">
+        <div class="code-title">📄 Cite</div>
+<pre><code>@inproceedings{da2026plantshade,
+  title     = {PlantShade: Predicting Plant Shadows for
+               Lighting-Aware Robotic Agricultural Operation},
+  author    = {Da, Longchao and Liu, Xiaoou and Li, Xingjian
+               and Xiang, Lirong and Wei, Hua},
+  booktitle = {IROS},
+  year      = {2026}
+}</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container footer-inner">
+    <div>
+      <div class="footer-brand">PlantShade</div>
+      <div class="footer-sub">Arizona State University · Cornell University · IROS 2026</div>
+    </div>
+    <div class="footer-links">
+      <a href="#PAPER_URL" data-link="paper" target="_blank">Paper</a>
+      <a href="#CODE_URL" data-link="code" target="_blank">Code</a>
+      <a href="#HF_URL" data-link="hf" target="_blank">Dataset</a>
+      <a href="https://github.com/ARLabXiang/AgriRoboSimUE5/releases/tag/plantshade" target="_blank">Data release</a>
+    </div>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
