@@ -9,7 +9,7 @@
   /* ---- editable external links (placeholders until published) ---- */
   const LINKS = {
     paper: "",   // e.g. "https://arxiv.org/abs/xxxx.xxxxx"
-    code:  "",   // e.g. "https://github.com/.../PlantShade"
+    code:  "https://github.com/DaRL-GenAI/PlantShade-code",
     hf:    "https://huggingface.co/datasets/xiao0o0o/PlantShade",
     model: "https://huggingface.co/xiao0o0o/PlantShade-ControlNet",
   };

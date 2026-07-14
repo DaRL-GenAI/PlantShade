@@ -397,9 +397,8 @@ shade_thresh = 40
       <div class="code-card">
         <div class="code-title">🌿 Step 5 · Estimate canopy photosynthesis</div>
 <pre><code>python 5_photosynthesis.py \
-    --eval_dir outputs/predictions \
-    --gt_base_dir data/shadow/target \
-    --depth_base_dir data/PlantShadeUnzip \
+    --split data/test_split.json \
+    --pred_dir outputs/predictions \
     --output_csv outputs/photosynthesis.csv
 
 def nrh(I, alpha, P_max, theta):        # non-rectangular hyperbola
