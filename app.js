@@ -8,7 +8,7 @@
 
   /* ---- editable external links (placeholders until published) ---- */
   const LINKS = {
-    paper: "",   // e.g. "https://arxiv.org/abs/xxxx.xxxxx"
+    paper: "https://arxiv.org/html/2609.21059v1",
     code:  "https://github.com/DaRL-GenAI/PlantShade-code",
     hf:    "https://huggingface.co/datasets/xiao0o0o/PlantShade",
     model: "https://huggingface.co/xiao0o0o/PlantShade-ControlNet",
